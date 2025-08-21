@@ -1,0 +1,53 @@
+.itemSearchPage {
+  display: flex;
+  gap: 25px;
+
+label {
+  min-width: 100px;
+}
+
+}
+
+
+.rdrCalendarWrapper{
+  max-height: 400px;
+  margin-bottom: 1rem;
+}
+
+
+
+.status-box {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  margin-right: 10px;
+  border: 1px solid black
+}
+
+.yellow-row {
+  background-color: #fff9c4; /* light yellow */
+}
+
+.blue-row {
+  background-color: #e3f2fd; /* light blue */
+}
+
+.green-row {
+  background-color: #dcedc8; /* light green */
+}
+
+.purple-row {
+  background-color: #f3e5f5; /* light purple */
+}
+
+.las {
+  font-size: 1.7rem;
+  margin: 0rem .3rem;
+}
+
+ .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+  }

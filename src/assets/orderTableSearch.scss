@@ -1,0 +1,45 @@
+.order__table__search {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(5, 1fr); /* Two columns with equal width */
+  grid-template-rows: repeat(auto-fit, 1fr); /* Two columns with equal width */
+  color: darkslategrey;
+   div > input, div > select {
+    width: 250px;
+    height: 1.7rem; 
+  }
+  .paging {
+    display: flex;
+  }
+  .table {
+    grid-column: span 4;
+    grid-row: span 4;
+
+    table {
+      margin-top: 0.2rem;
+
+
+  a {
+  text-decoration: none ;
+
+  }
+
+    a:hover {
+      color : darkslategrey;
+    }
+
+
+    }
+  } 
+  .pagination__line{
+    display: flex;
+    font-family: courier;
+    justify-content: space-between;
+    select {
+      width: 100px;
+      height: auto;
+      padding: 0px;
+    }
+  }
+}
+

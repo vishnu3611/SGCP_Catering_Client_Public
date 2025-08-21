@@ -1,0 +1,15 @@
+
+  .paging {
+    display: flex;
+  }
+  .pagination__line{
+    display: flex;
+    font-family: courier;
+    justify-content: space-between;
+    select {
+      width: 100px;
+      height: auto;
+      padding: 0px;
+    }
+  }
+

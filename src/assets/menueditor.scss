@@ -1,0 +1,26 @@
+.price__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+   opacity: 0.8;
+}
+
+.price__label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.price__input {
+  width: 40px;
+}
+
+.hide {
+  display: none !important;
+}
+
+.sticky-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999;
+}

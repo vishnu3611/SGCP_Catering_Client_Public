@@ -1,0 +1,1030 @@
+import React, {useState, useEffect, useContext} from "react";
+import {useParams} from "react-router-dom";
+import {server} from "../constants";
+import AutoCompleteInput from "../components/AutoCompleteInput";
+import CategoryNotes from "../components/CategoryNotes";
+import categoryNotes from "../components/CategoryNotes";
+import NotesForm from "../components/NotesForm";
+import {uuid} from "uuidv4";
+import {CATERING_TIME, SPICE_LEVEL} from "../constants";
+import CheckboxList from "../components/CheckboxList";
+import {ProductsDataContext} from "../App";
+
+let categories = [];
+const OrderDetail = (props) => {
+    const {productsJSON} = useContext(ProductsDataContext);
+    const [cart, setCart] = useState([]);
+    const [customCart, setCustomCart] = useState([]);
+    const [totalPrice, setTotalPrice] = useState(0);
+    const [balAmount, setBalAmount] = useState(0);
+    const [formData, setFormData] = useState({
+        name: "",
+        email: "",
+        mobile: "",
+        homeAddress: "",
+        kidsCount: "",
+        adultCount: "",
+        vegCount: "",
+        nonVegCount: "",
+        address: "",
+        notes: "",
+        revisionNotes: "",
+        spiceLevel: "",
+        orderStatus: "",
+        adminNotes: "",
+        balAmount: 0,
+        advAmount: 0,
+        total: 0,
+        pickupTime: "00:00",
+        reference: "",
+        deliveryCharge: 0,
+        warmersAndBurners: 0,
+        teaFlask: 0,
+    });
+    const [loading, setLoading] = useState(true);
+    const {orderID} = useParams();
+    const [newProductName, setNewProductName] = useState("");
+
+    const uniqueCategories = Array.from(
+        new Set(productsJSON.map((item) => item.categoryName))
+    );
+
+    const items = [
+        {label: "Fryums", value: 501, id: "fryums"},
+        {label: "Raitha", value: 500, id: "raitha"},
+        {label: "Salna", value: 504, id: "salna"},
+        {
+            label: "Peanut & Coconut Chutney",
+            value: 502,
+            id: "peanut-coconut-chutney",
+        },
+        {label: "Ginger Chutney", value: 503, id: "ginger-chutney"},
+        {label: "Sambar", value: 103, id: "sambar"}
+    ];
+
+    const handleSelectionChange = (selectedItems, currentItem) => {
+        if (currentItem[1]) {
+            addToCart(Number(currentItem[0]));
+        } else {
+            const items = cart.filter(
+                (item) => item.productID !== Number(currentItem[0])
+            );
+            setCart(items);
+        }
+    };
+
+    function handleAddProduct(cPN) {
+        if (cPN) {
+            setCustomCart([
+                ...customCart,
+                {tempID: uuid(), productName: cPN},
+            ]);
+        } else {
+            setCustomCart([
+                ...customCart,
+                {tempID: uuid(), productName: newProductName},
+            ]);
+            setNewProductName("");
+        }
+    }
+
+    const convertTimeToReadable = (date, include = "date") => {
+        let dateJS = new Date(date);
+        let offset = dateJS.getTimezoneOffset();
+        dateJS = new Date(dateJS.getTime() + offset * 60 * 1000);
+        let options = {};
+        if (include === "date") {
+            options = {year: "numeric", month: "long", day: "numeric"};
+        } else if (include === "datetime") {
+            options = {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "numeric",
+                minute: "numeric",
+            };
+        }
+        const readableDate = dateJS.toLocaleDateString("en-US", options);
+        return readableDate;
+    };
+
+    function handleCustomCart(customProduct, index) {
+        const updatedCustomCart = [...customCart];
+        updatedCustomCart[index] = customProduct;
+        setCustomCart(updatedCustomCart);
+    }
+
+    useEffect(() => {
+        // Calculate the total price of the items in the cart
+
+        const total = cart.reduce((acc, item) => {
+            const product = productsJSON.find(
+                (p) => p.productID === item.productID
+            );
+            return acc + product.priceList[item.size] * item.quantity;
+        }, 0);
+
+        const customCarttotal = customCart.reduce((acc, item) => {
+            return acc + parseInt(item.price, 10);
+        }, 0);
+
+        setTotalPrice(total + customCarttotal);
+    }, [cart, customCart]);
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            const token = localStorage.getItem("jwt");
+            const response = await fetch(
+                server + "/user/orderDetail/" + orderID,
+                {
+                    headers: {
+                        Authorization: `${token}`,
+                    },
+                }
+            );
+            const data = await response.json();
+            const dc = data.cart.map((cartItem) => {
+                return {...cartItem, tempID: uuid()};
+            });
+            const dcc = data.customCart.map((cartItem) => {
+                return {...cartItem, tempID: uuid()};
+            });
+            setCart(dc);
+            setCustomCart(dcc);
+
+            for (const [key, value] of Object.entries(data.formData[0])) {
+                if (
+                    data.formData[0][value] !== null ||
+                    data.formData[0][value] !== null
+                )
+                    formData[key] = value;
+                console.log(key, value);
+            }
+
+            categories = Object.keys(data.categoryNotes).reduce((acc, key) => {
+                if (
+                    key !== "id" &&
+                    key !== "orderID" &&
+                    key !== "createdAt" &&
+                    key !== "updatedAt"
+                ) {
+                    return {...acc, [key]: data.categoryNotes[key]};
+                }
+                return acc;
+            }, {});
+            if (!formData.pickupTime) {
+                const pickupTimeMap = {
+                    Breakfast: "08:30",
+                    Lunch: "12:00",
+                    Dinner: "18:00",
+                };
+
+                if (pickupTimeMap[formData.cateringTime]) {
+                    setFormData((prevData) => ({
+                        ...prevData,
+                        pickupTime: pickupTimeMap[formData.cateringTime],
+                    }));
+                }
+            }
+
+            setLoading(false);
+        };
+
+        fetchProducts();
+    }, []);
+
+    useEffect(() => {
+        const advancedAmount = parseFloat(formData.advAmount) || 0;
+        const totalPrice = parseFloat(formData.totalPrice) || 0;
+        setBalAmount(totalPrice - advancedAmount);
+    }, [formData.advAmount, formData.totalPrice]);
+
+
+    const getProductName = (productID) => {
+        const product = productsJSON.find(
+            (product) => product.productID === productID
+        );
+        return product ? product.productName : null;
+    };
+
+    const getProductOptions = (productID) => {
+        const product = productsJSON.find(
+            (product) => product.productID === productID
+        );
+        return product ? Object.keys(product.priceList) : [];
+    };
+
+    const getProductPrice = (productID, size) => {
+        const product = productsJSON.find(
+            (product) => product.productID === productID
+        );
+        return product ? product.priceList[size] : null;
+    };
+
+    const handleInputChange = (event) => {
+        const {name, value} = event.target;
+        setFormData((prevState) => ({
+            ...prevState,
+            [name]: value,
+        }));
+    };
+    const handleNoteChange = (event, productID, tempID) => {
+        const updatedCart = cart.map((product) => {
+            if (product.productID === productID && product.tempID === tempID) {
+                console.log({
+                    ...product,
+                    productNote: event.target.value
+                });
+                return {
+                    ...product,
+                    productNote : event.target.value
+                };
+            } else {
+                return product;
+            }
+        })
+        setCart(updatedCart);
+    };
+    const handleQuantityChange = (event, productID, tempID) => {
+        const updatedCart = cart.map((product) => {
+            console.log(tempID == product.tempID);
+            if (product.productID === productID && product.tempID === tempID) {
+                console.log({
+                    ...product,
+                    quantity: event.target.value,
+                    price:
+                        getProductPrice(product.productID, product.size) *
+                        event.target.value,
+                });
+                return {
+                    ...product,
+                    quantity: event.target.value,
+                    price:
+                        getProductPrice(product.productID, product.size) *
+                        event.target.value,
+                };
+            } else {
+                return product;
+            }
+        });
+        setCart(updatedCart);
+    };
+
+    const handleSizeChange = (event, productID, tempID) => {
+        const updatedCart = cart.map((product) => {
+            if (product.productID === productID && product.tempID === tempID) {
+                console.log({
+                    ...product,
+                    size: event.target.value,
+                    price:
+                        getProductPrice(product.productID, event.target.value) *
+                        product.quantity,
+                });
+                return {
+                    ...product,
+                    size: event.target.value,
+                    price:
+                        getProductPrice(product.productID, event.target.value) *
+                        product.quantity,
+                };
+            } else {
+                return product;
+            }
+        });
+        setCart(updatedCart);
+    };
+
+    const addToCart = (productID) => {
+        console.log(productID);
+        const product = productsJSON.find(
+            (product) => product.productID === productID
+        );
+
+        if (product) {
+            const quantity = 1;
+            const tempID = uuid();
+            const size = "Need Estimate";
+            const price = 0;
+            const productOrderDate = new Date().toISOString();
+
+            setCart([
+                ...cart,
+                {tempID, productID, quantity, size, price, productOrderDate},
+            ]);
+        }
+    };
+
+    const cloneProductFromCart = (product, productType) => {
+        if (productType === "custom") {
+            console.log(product);
+            const {productName, quantity, size, productNote, price, productOrderDate} =
+                product;
+            const index = customCart.findIndex(
+                (item) => item.tempID === product.tempID
+            );
+            const newItem = {
+                    tempID: uuid(),
+                    productName,
+                    quantity,
+                    size,
+                    productNote,
+                    price,
+                    productOrderDate,
+                },
+                newCart = [...customCart];
+            newCart.splice(index + 1, 0, newItem);
+            setCustomCart(newCart);
+        } else {
+            const {productID, quantity, size, productNote, price, productOrderDate} =
+                product;
+            const tempID = uuid();
+            const index = cart.findIndex(
+                (item) => item.tempID === product.tempID
+            );
+            const newItem = {
+                tempID,
+                productID,
+                quantity,
+                size,
+                productNote,
+                price,
+                productOrderDate,
+            };
+            const newCart = [...cart];
+            newCart.splice(index + 1, 0, newItem);
+            setCart(newCart);
+        }
+    };
+
+    const removeProductFromCart = (tempID) => {
+        setCart(
+            cart.filter((item) => {
+                return item.tempID !== tempID;
+            })
+        );
+    };
+    const removeProductFromCustomCart = (tempID) => {
+        console.log(customCart, tempID);
+        setCustomCart(customCart.filter((item) => item.tempID !== tempID));
+    };
+
+    function getDayOfWeek(dateString) {
+        const options = {weekday: "long", timeZone: "UTC"};
+        const dateObj = new Date(dateString);
+        const dayOfWeek = dateObj.toLocaleDateString("en-US", options);
+        return dayOfWeek;
+    }
+
+    if (loading) {
+        return <div>Loading...</div>;
+    }
+
+    return (
+        <>
+            <div className={`${props.view && "overlay"}`}></div>
+            <div className={`admin_order`}>
+                <div classname="grid-container customer__details ">
+                    <div>
+                        <div className="form-box">
+                            <label htmlFor="orderID">Order ID:</label>{" "}
+                            {formData.orderID}{" "}
+                        </div>
+                        <div className="form-box">
+                            <label htmlFor="name">Name:</label> {formData.name}{" "}
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="email">Email:</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="mobile">Mobile:</label>
+                            <input
+                                type="tel"
+                                id="mobile"
+                                name="mobile"
+                                value={formData.mobile}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="homeAddress">Home Address:</label>
+                            <input
+                                type="text"
+                                id="homeAddress"
+                                name="homeAddress"
+                                value={formData.homeAddress}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="adultCount">Adult Count:</label>
+                            <input
+                                type="number"
+                                id="adultCount"
+                                name="adultCount"
+                                value={formData.adultCount}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="kidsCount">Kids Count:</label>
+                            <input
+                                type="number"
+                                id="kidsCount"
+                                name="kidsCount"
+                                value={formData.kidsCount}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="vegCount">Veg Count:</label>
+                            <input
+                                type="number"
+                                id="vegCount"
+                                name="vegCount"
+                                value={formData.vegCount}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="nonVegCount">Non Veg Count:</label>
+                            <input
+                                type="number"
+                                id="nonVegCount"
+                                name="nonVegCount"
+                                value={formData.nonVegCount}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="cateringDate">Catering Date:</label>
+                            <input
+                                type="date"
+                                id="cateringDate"
+                                name="cateringDate"
+                                value={formData.cateringDate}
+                                onChange={handleInputChange}
+                            />
+                            {getDayOfWeek(formData.cateringDate)}
+                        </div>
+                        <div className="form-box">
+                            <label htmlFor="tf">Tea Flask:</label>
+                            <input
+                                type="text"
+                                id="tf"
+                                name="teaFlask"
+                                value={formData.teaFlask}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+
+                        <div className="form-box">
+                            <label htmlFor="wnb">Warmers And Burners:</label>
+                            <input
+                                type="text"
+                                id="wnb"
+                                name="warmersAndBurners"
+                                onChange={handleInputChange}
+                                value={formData.warmersAndBurners}
+                            />
+                        </div>
+                        <div className="form-box">
+                            <label htmlFor="address">Catering Address:</label>
+                            <input
+                                type="text"
+                                id="address"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                        <div className="form-box">
+                            <label htmlFor="deliveryCharge">
+                                Delivery Charge:
+                            </label>
+                            <input
+                                type="number"
+                                id="deliveryCharge"
+                                name="deliveryCharge"
+                                value={formData.deliveryCharge}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                        <div className="form-box">
+                            <label htmlFor="reference">Reference:</label>
+                            <input
+                                type="text"
+                                id="reference"
+                                name="reference"
+                                value={formData.reference}
+                                onChange={handleInputChange}
+                            />
+                        </div>
+                        <div className="radio-container">
+                            <div className="radio-label">
+                                <label>Catering Time :</label>
+                            </div>
+                            <div className="radio-buttons">
+                                {CATERING_TIME.map((time) => (
+                                    <label key={time}>
+                                        <input
+                                            type="radio"
+                                            id="cateringTime"
+                                            name="cateringTime"
+                                            value={time}
+                                            checked={
+                                                formData.cateringTime === time
+                                            }
+                                            onChange={(event) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    cateringTime:
+                                                    event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <span className="radio-button-label">
+                                            {time}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="radio-container">
+                            <div className="radio-label">
+                                <label for="spiceLevel">Spice Level:</label>
+                            </div>
+                            <div className="radio-buttons">
+                                {SPICE_LEVEL.map((level) => (
+                                    <label key={level}>
+                                        <input
+                                            type="radio"
+                                            id={level}
+                                            name="spiceLevel"
+                                            value={level}
+                                            checked={
+                                                formData.spiceLevel === level
+                                            }
+                                            onChange={(event) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    spiceLevel:
+                                                    event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <span class="radio-button-label">
+                                            {level}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Size</th>
+                        <th>Note</th>
+                        <th>Price</th>
+                        <th>Product Order Date</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {cart.map((product) => (
+                        <tr key={product.tempID}>
+                            <td>
+                                {getProductName(product.productID)}
+                                <i
+                                    className="las la-minus-square"
+                                    onClick={() =>
+                                        removeProductFromCart(
+                                            product.tempID
+                                        )
+                                    }
+                                ></i>
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    name={product.tempID}
+                                    value={product.quantity}
+                                    onChange={(e) =>
+                                        handleQuantityChange(
+                                            e,
+                                            product.productID,
+                                            product.tempID
+                                        )
+                                    }
+                                />
+                            </td>
+                            <td>
+                                <select
+                                    name={product.tempID}
+                                    value={product.size}
+                                    onChange={(e) =>
+                                        handleSizeChange(
+                                            e,
+                                            product.productID,
+                                            product.tempID
+                                        )
+                                    }
+                                >
+                                    {getProductOptions(
+                                        product.productID
+                                    ).map((option) => (
+                                        <option key={option}>
+                                            {option}
+                                        </option>
+                                    ))}
+                                </select>
+                                <i
+                                    className="las la-plus-circle"
+                                    onClick={() =>
+                                        cloneProductFromCart(product)
+                                    }
+                                ></i>
+                            </td>
+                            <td>
+                                <input
+                                    type="text"
+                                    name={product.productNote}
+                                    value={product.productNote}
+                                    onChange={(e) =>
+                                        handleNoteChange(
+                                            e,
+                                            product.productID,
+                                            product.tempID
+                                        )
+                                    }
+                                />
+                            </td>
+                            <td>{product.price}</td>
+                            <td>
+                                {convertTimeToReadable(
+                                    product.productOrderDate
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    {customCart.map((customProduct, index) => (
+                        <tr key={customProduct.tempID}>
+                            <td>
+                                <input
+                                    type="text"
+                                    value={customProduct.productName}
+                                    onChange={(event) => {
+                                        handleCustomCart(
+                                            {
+                                                ...customProduct,
+                                                productName:
+                                                event.target.value,
+                                            },
+                                            index
+                                        );
+                                    }}
+                                />
+
+                                <i
+                                    className="las la-minus-square"
+                                    onClick={() =>
+                                        removeProductFromCustomCart(
+                                            customProduct.tempID
+                                        )
+                                    }
+                                ></i>
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    value={customProduct.quantity}
+                                    onChange={(event) => {
+                                        handleCustomCart(
+                                            {
+                                                ...customProduct,
+                                                quantity:
+                                                event.target.value,
+                                            },
+                                            index
+                                        );
+                                    }}
+                                />
+                            </td>
+                            <td>
+                                <input
+                                    type="text"
+                                    value={customProduct.size}
+                                    onChange={(event) => {
+                                        handleCustomCart(
+                                            {
+                                                ...customProduct,
+                                                size: event.target.value,
+                                            },
+                                            index
+                                        );
+                                    }}
+                                />
+                                <i
+                                    className="las la-plus-circle"
+                                    onClick={() =>
+                                        cloneProductFromCart(
+                                            customProduct,
+                                            "custom"
+                                        )
+                                    }
+                                ></i>
+                            </td>
+                            <td>
+                                <input
+                                    type="text"
+                                    value={customProduct.productNote}
+                                    onChange={(event) =>
+                                        handleCustomCart(
+                                            {
+                                                ...customProduct,
+                                                productNote: event.target.value,
+                                            },
+                                            index
+                                        )
+                                    }
+                                />
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    value={customProduct.price}
+                                    onChange={(event) => {
+                                        handleCustomCart(
+                                            {
+                                                ...customProduct,
+                                                price: event.target.value,
+                                            },
+                                            index
+                                        );
+                                    }}
+                                />
+                            </td>
+                            <td></td>
+                        </tr>
+                    ))}
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td>Total Price:</td>
+                        <td>{totalPrice}</td>
+                        <td></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <AutoCompleteInput
+                    AddCustomCart={handleAddProduct}
+                    addToCart={addToCart}
+                />
+                <br/>
+                <br/>
+                <input
+                    type="text"
+                    value={newProductName}
+                    onChange={(event) => setNewProductName(event.target.value)}
+                />
+                <button type="button" onClick={() => handleAddProduct()}>
+                    Add Custom Product
+                </button>
+                <CheckboxList
+                    items={items}
+                    onSelectionChange={handleSelectionChange}
+                />
+                <CategoryNotes categories={categories}/>
+                <div classname="grid-container customer__details">
+                    <label htmlFor="pickupTime">Pickup Time: </label>
+                    <input
+                        type="time"
+                        name="pickupTime"
+                        min="00:00"
+                        max="23:59"
+                        step="60"
+                        onChange={handleInputChange}
+                        value={formData.pickupTime}
+                    />
+                </div>
+                {" "}
+                <div>
+                    <label htmlFor="advAmount">Advanced Amount: </label>
+                    <input
+                        type="text"
+                        id="advAmount"
+                        name="advAmount"
+                        onChange={handleInputChange}
+                        value={formData.advAmount || 0}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="balAmount">Balance Amount: </label>
+                    <span>{balAmount}</span>
+                </div>
+                <div>
+                    <label htmlFor="mtp">Total Price: </label>
+                    <input
+                        type="text"
+                        id="mtp"
+                        name="totalPrice"
+                        onChange={handleInputChange}
+                        value={formData.totalPrice || 0}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="notes">Notes:</label>
+                    <textarea
+                        id="notes"
+                        className="textarea2"
+                        name="notes"
+                        disabled
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="revisionNotes">Revised Notes:</label>
+                    <textarea
+                        id="revisionNotes"
+                        className="textarea2"
+                        name="revisionNotes"
+                        value={formData.revisionNotes}
+                        onChange={handleInputChange}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="adminNotes">Staff Notes:</label>
+                    <textarea
+                        id="adminNotes"
+                        className="textarea2"
+                        name="adminNotes"
+                        value={formData.adminNotes}
+                        onChange={handleInputChange}
+                    />
+                </div>
+                <div className="form-box">
+                    <label htmlFor="orderStatus">Order Status :</label>
+                    <span> {formData.orderStatus} </span>
+                </div>
+                <div className="order__buttons">
+                    <UpdateOrder
+                        orderStatus={"pending"}
+                        orderID={orderID}
+                        cart={cart}
+                        customCart={customCart}
+                        label="Update"
+                        formData={formData}
+                    />
+                    <UpdateOrder
+                        orderStatus={"quoted"}
+                        orderID={orderID}
+                        cart={cart}
+                        customCart={customCart}
+                        label="Quote"
+                        formData={formData}
+                    />
+                    <UpdateOrder
+                        orderStatus={"cancelled"}
+                        orderID={orderID}
+                        cart={cart}
+                        customCart={customCart}
+                        label="Cancel Order"
+                        formData={formData}
+                    />
+                    <UpdateOrder
+                        orderStatus={"confirmed"}
+                        orderID={orderID}
+                        customCart={customCart}
+                        cart={cart}
+                        label="Confirm"
+                        formData={formData}
+                    />
+                    <UpdateOrder
+                        orderStatus={"completed"}
+                        orderID={orderID}
+                        customCart={customCart}
+                        cart={cart}
+                        label="Completed"
+                        formData={formData}
+                    />
+                </div>
+            </div>
+        </>
+    );
+};
+
+function UpdateOrder({
+                         formData,
+                         orderStatus,
+                         orderID,
+                         cart,
+                         label,
+                         customCart,
+                     }) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
+
+    const updateOrder = async () => {
+        if (
+            formData.cateringTime === "Breakfast" &&
+            formData.pickupTime > "10:00"
+        ) {
+            alert("Pickup Time needs to be updated.");
+            return;
+        } else if (
+            formData.cateringTime === "Lunch" &&
+            (formData.pickupTime > "14:00" || formData.pickupTime < "09:00")
+        ) {
+            alert("Pickup Time needs to be updated.");
+            return;
+        } else if (
+            formData.cateringTime === "Dinner" &&
+            (formData.pickupTime > "20:00" || formData.pickupTime < "15:00")
+        ) {
+            alert("Pickup Time needs to be updated.");
+            return;
+        }
+
+        //delivery fix
+        if (formData.deliveryCharge === "") {
+            formData.deliveryCharge = 0;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const token = localStorage.getItem("jwt");
+            const response = await fetch(server + `/user/updateOrder`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `${token}`,
+                },
+                body: JSON.stringify({
+                    formData,
+                    orderStatus,
+                    orderID,
+                    cart,
+                    customCart,
+                }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSuccess(true);
+            } else throw new Error("Request failed");
+        } catch (error) {
+            setError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div>
+            {isLoading && <div>Loading...</div>}
+            {error && <div className="error">{error}</div>}
+            {success && <div>Success!</div>}
+            <button onClick={updateOrder} disabled={isLoading}>
+                {label}
+            </button>
+        </div>
+    );
+}
+
+export default OrderDetail;
