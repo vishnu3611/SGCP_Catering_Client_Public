@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/static/css/main.93e7b573.css",
-    "main.js": "/static/js/main.87b57424.js",
+    "main.css": "/static/css/main.cf1259d7.css",
+    "main.js": "/static/js/main.f3633923.js",
     "static/media/small_tray.png": "/static/media/small_tray.86d2aa94567597c3ee40.png",
     "static/media/namaste.jpg": "/static/media/namaste.194b21c78492d46e8f97.jpg",
     "static/media/full_tray.jpg": "/static/media/full_tray.e22f4dd1f16854040ace.jpg",
@@ -10,7 +10,7 @@
     "index.html": "/index.html"
   },
   "entrypoints": [
-    "static/css/main.93e7b573.css",
-    "static/js/main.87b57424.js"
+    "static/css/main.cf1259d7.css",
+    "static/js/main.f3633923.js"
   ]
 }
